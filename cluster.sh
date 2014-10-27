@@ -9,20 +9,20 @@
 # THIS SCRIPT CANNOT HANDLE SYSTEM HANG OR PROCESS HANG ISSUE
 #
 #
-GRACE=1; # THIS IS THE GRACE PERIOD THE SYSTEM WAITS BEFORE BRINGING RESOURCES ONLINE ON ITSELF
-REBOOT=0; # THIS TRIGGERS IF SYSTEM WILL REBOOT IF ITSELF IS UNREACHABLE IN THE NETWORK OR THE OTHER NODE IS IF ITS A SLAVE NODE
+GRACE=30; # THIS IS THE GRACE PERIOD THE SYSTEM WAITS BEFORE BRINGING RESOURCES ONLINE ON ITSELF
+REBOOT=1; # THIS TRIGGERS IF SYSTEM WILL REBOOT IF ITSELF IS UNREACHABLE IN THE NETWORK OR THE OTHER NODE IS IF ITS A SLAVE NODE
 VIP="10.120.110.28";
 GW="10.120.110.1";
-HOST1="10.120.110.27";
-HOST2="10.120.110.26";
-CLUSTERNAME="ebs-db";
+HOST1="10.120.110.26";
+HOST2="10.120.110.27";
+CLUSTERNAME="partex-ebs-db";
 LOGFILE="/var/log/$CLUSTERNAME.log";
 INTERFACE="bond0";
 PROCESS="pmon";
 PING="/bin/ping";
 GREP="/bin/grep";
 DF="/bin/df -h";
-FILE_SYSTEMS="mnt";
+FILE_SYSTEMS="d1|d2|d3|d4|d5|ebsdbbkp";
 EGREP="/bin/egrep";
 PS="/bin/ps -ef";
 
@@ -33,7 +33,7 @@ PS="/bin/ps -ef";
                 /sbin/ip addr add "$VIP/24" dev $INTERFACE;
                 if [ $? -eq 0 ]
                 then
-                        /sbin/arping -b -c 3 -s $VIP -I bond1 $GW > /dev/null; # THIS IS A DUMP LINUX ARP BROADCAST;
+                        /sbin/arping -b -c 3 -s $VIP -I bond0 $GW > /dev/null; # THIS IS A DUMP LINUX ARP BROADCAST;
                         return 0;
                 else
                         return 1;
@@ -67,12 +67,12 @@ PS="/bin/ps -ef";
                 /usr/sbin/lvchange -ay /dev/ebsdbvg05/lvol0
                 /usr/sbin/lvchange -ay /dev/ebsdb_backupvg/lvol0
 
-                /sbin/fsck -y /dev/ebsdbvg01/lvol0
-                /sbin/fsck -y /dev/ebsdbvg02/lvol0
-                /sbin/fsck -y /dev/ebsdbvg03/lvol0
-                /sbin/fsck -y /dev/ebsdbvg04/lvol0
-                /sbin/fsck -y /dev/ebsdbvg05/lvol0
-                /sbin/fsck -y /dev/ebsdb_backupvg/lvol0
+#               /sbin/fsck -y /dev/ebsdbvg01/lvol0
+#               /sbin/fsck -y /dev/ebsdbvg02/lvol0
+#               /sbin/fsck -y /dev/ebsdbvg03/lvol0
+#               /sbin/fsck -y /dev/ebsdbvg04/lvol0
+#               /sbin/fsck -y /dev/ebsdbvg05/lvol0
+#               /sbin/fsck -y /dev/ebsdb_backupvg/lvol0
 
                 /bin/mount -t ext3 /dev/ebsdbvg01/lvol0 /d1
                 STAT1=$?;
@@ -97,22 +97,22 @@ PS="/bin/ps -ef";
 
         offline_FS ()
         {
-                /bin/umount /dev/ebsdbvg01/lvol0
+                /bin/umount -l /dev/ebsdbvg01/lvol0
                 if [ $? -eq 0 ]
                 then
-                        /bin/umount /dev/ebsdbvg02/lvol0;
+                        /bin/umount -l /dev/ebsdbvg02/lvol0;
                         if [ $? -eq 0 ]
                         then
-                                /bin/umount /dev/ebsdbvg03/lvol0;
+                                /bin/umount -l /dev/ebsdbvg03/lvol0;
                                 if [ $? -eq 0 ]
                                 then
-                                        /bin/umount /dev/ebsdbvg04/lvol0;
+                                        /bin/umount -l /dev/ebsdbvg04/lvol0;
                                         if [ $? -eq 0 ]
                                         then
-                                                /bin/umount /dev/ebsdbvg05/lvol0
+                                                /bin/umount -l /dev/ebsdbvg05/lvol0
                                                 if [ $? -eq 0 ]
                                                 then
-                                                        /bin/umount /dev/ebsdb_backupvg/lvol0
+                                                        /bin/umount -l /dev/ebsdb_backupvg/lvol0
                                                         /usr/sbin/lvchange -an /dev/ebsdbvg01/lvol0
                                                         /usr/sbin/lvchange -an /dev/ebsdbvg02/lvol0
                                                         /usr/sbin/lvchange -an /dev/ebsdbvg03/lvol0
@@ -146,11 +146,11 @@ PS="/bin/ps -ef";
 
         online_app ()
         {
-                /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_db-prod-ebs/addbctl.sh start";
+                /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_dbebs/addbctl.sh start";
                 if [ $? -eq 0 ]
                 then
                         echo "`date` $HOSTNAME $CLUSTERNAME: Database started successfully.";
-                        /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_db-prod-ebs/addlnctl.sh start prod";
+                        /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_dbebs/addlnctl.sh start prod";
                         if [ $? -eq 0 ]
                         then
                                 echo "`date` $HOSTNAME $CLUSTERNAME: Listener started successfully.";
@@ -167,11 +167,12 @@ PS="/bin/ps -ef";
 
         offline_app ()
         {
-                /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_db-prod-ebs/addlnctl.sh stop prod";
+                /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_dbebs/addlnctl.sh stop prod";
+                #/bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_db-prod-ebs/addlnctl.sh stop prod";
                 if [ $? -eq 0 ]
                 then
                         echo "`date` $HOSTNAME $CLUSTERNAME: Listener stopped successfully.";
-                        /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_db-prod-ebs/addbctl.sh stop immediate";
+                        /bin/su - oracle -c "/u1/oracle/PROD/db/tech_st/11.1.0/appsutil/scripts/PROD_dbebs/addbctl.sh stop immediate";
                         if [ $? -eq 0 ]
                         then
                                 echo "`date` $HOSTNAME $CLUSTERNAME: Database stopped successfully.";
@@ -387,4 +388,3 @@ PS="/bin/ps -ef";
         fi
 
 } >> $LOGFILE;
-
